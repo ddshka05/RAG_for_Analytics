@@ -1,6 +1,5 @@
-import fitz # ИМпортируем PyMuPDF
+import fitz # Импортируем PyMuPDF
 import zipfile # Импортируем модуль для работы с zip-файлом
-
 
 def extract_text(pdf_data: bytes) -> str:
   """
@@ -16,13 +15,15 @@ def extract_text(pdf_data: bytes) -> str:
   doc = fitz.open(stream = pdf_data, filetype="pdf")
   text = ""
 
-  for page in doc:
-    text += page.get_text() + "\n"
+  text_dict = {} # Будем хранить так {номер страницы: текст со страницы}
+  for page in enumerate(doc, 1):
+    text_dict[page[0]] = page[1].get_text()
 
   doc.close()
 
   return text
 
+data = {} # Создаем словарь для хранения данных по компаниям : {"Отчет_компании": [{номер страницы: текст со страницы}, ...], ...}
 
 with zipfile.ZipFile("DATA.zip", "r") as zip_data: # Открываем папку
   file_list = zip_data.namelist() # С помощью функции namelist() считываем называния файлов в папке в список
@@ -33,7 +34,6 @@ with zipfile.ZipFile("DATA.zip", "r") as zip_data: # Открываем папк
     text = extract_text(pdf_data)            # Пользуемся функцией для преобразования байтов в текст
     data[file_name] = [text]                 # сохраняем полученный результат в словарь
 
-
-data = {} # Создаем словарь для хранения данных по компаниям : {"Отчет_компании_1": [текст отчета], ...}
-
-print(*enumirate(data.keys(), 1), sep='\n') # Список ключей - названия файлов с отчетами
+# Проверим, что получилось
+for key, value in data.items():
+  print(f'Ключ: {key}, Значение: {value}.', sep='\n')
