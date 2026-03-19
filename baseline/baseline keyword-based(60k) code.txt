@@ -1,0 +1,143 @@
+KEYWORDS = {                                  #в данной модели используем поиск по ключевым словам
+    "revenue_2024": ["выручк", "revenue"],    #для каждого вопроса(id) прописываем ключевое слово без окончания и на англ. языке
+    "net_profit_2024": ["чистая прибыль", "прибыль", "net profit"],
+    "total_assets_2024_12_31": ["актив", "assets"],
+    "cash_and_equivalents_2024_12_31": ["денежн", "cash"],
+    "long_term_loans_2024_12_31": ["долгосроч", "long-term"],
+    "short_term_loans_2024_12_31": ["краткосроч", "short-term"],
+    "dividends_paid_2024": ["дивиденд"],
+    "share_capital_2024_12_31": ["уставн", "capital"],
+    "ppe_book_value_2024_12_31": ["основн", "fixed assets"],
+    "income_tax_paid_2024": ["налог на прибыль", "income tax"]
+}
+
+import os                             #импортируем библиотеки
+import pdfplumber
+from gigachat import GigaChat
+
+REPORTS_DIR = "reports"            #указываем директорию с отчетами
+
+QUESTIONS = [                      #формируем список вопросов и их id
+    {
+        "id": "revenue_2024",
+        "question": "Какая выручка компании за 2024 год?"
+    },
+    {
+        "id": "net_profit_2024",
+        "question": "Какую чистую прибыль компания получила за 2024 год?"
+    },
+    {
+        "id": "total_assets_2024_12_31",
+        "question": "Какова общая сумма активов компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "cash_and_equivalents_2024_12_31",
+        "question": "Какова сумма денежных средств и их эквивалентов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "long_term_loans_2024_12_31",
+        "question": "Какова общая сумма долгосрочных кредитов и займов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "short_term_loans_2024_12_31",
+        "question": "Какова общая сумма краткосрочных кредитов и займов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "dividends_paid_2024",
+        "question": "Какая сумма была выплачена в виде дивидендов за 2024 год?"
+    },
+    {
+        "id": "share_capital_2024_12_31",
+        "question": "Каков размер уставного капитала компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "ppe_book_value_2024_12_31",
+        "question": "Какова балансовая стоимость основных средств компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "income_tax_paid_2024",
+        "question": "Какова была сумма налога на прибыль, уплаченная компанией в 2024 году?"
+    }
+]
+
+questions_text = "\n".join(                                  #формируем структуру запроса 
+    [f"- {q['id']}: {q['question']}" for q in QUESTIONS]
+)
+
+schema_text = ",\n".join(                                         #формируем структуру ответа
+    [
+        f'  "{q["id"]}": {{ "value": number | null, "currency": string | null, "evidence_found": boolean }}'
+        for q in QUESTIONS
+    ]
+)
+
+
+def read_pdf_keyword_based(path: str) -> str:              #читаем пдф, выбираем только страницы с совпадениями по ключевым словам
+    collected_pages = []
+
+    with pdfplumber.open(path) as pdf:
+        for page_num, page in enumerate(pdf.pages):
+            page_text = page.extract_text()
+            if not page_text:
+                continue
+
+            page_text_lower = page_text.lower()
+
+            # если на странице есть хотя бы одно ключевое слово
+            if any(
+                kw in page_text_lower
+                for kws in KEYWORDS.values()
+                for kw in kws
+            ):
+                collected_pages.append(
+                    f"\n--- PAGE {page_num + 1} ---\n" + page_text
+                )
+
+    return "\n".join(collected_pages)
+
+
+pdf_files = [                               #создаем перечень всех файлов для обработки
+    f for f in os.listdir(REPORTS_DIR)
+    if f.lower().endswith(".pdf")
+]
+
+
+with GigaChat(                                  #отправляем запрос модели
+    credentials="#############",
+    verify_ssl_certs=False
+) as chat:
+
+    for pdf_name in pdf_files:
+        print(f"\n=== REPORT: {pdf_name} ===")
+
+        pdf_path = os.path.join(REPORTS_DIR, pdf_name)
+        report_text = read_pdf_keyword_based(pdf_path)
+
+        MAX_CHARS = 60000      #вводим ограничение по символам
+        report_text = report_text[:MAX_CHARS]
+
+        prompt = f"""                      #задаем промпт для нейронки
+Ты — система извлечения информации из финансовой отчетности.
+
+Ответь на вопросы СТРОГО на основе предоставленного текста.
+
+Верни СТРОГО JSON следующего формата:
+{{
+{schema_text}
+}}
+
+Правила:
+- Используй ТОЛЬКО предоставленный текст
+- НИЧЕГО не придумывай
+- Если информация не найдена — value = null и evidence_found = false
+
+Текст отчета:
+{report_text}
+
+Вопросы:
+{questions_text}
+"""
+
+        response = chat.chat(prompt)
+        print(response)                    #получаем ответ
+

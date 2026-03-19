@@ -1,0 +1,116 @@
+import os                                     #импортируем необходимые библиотеки
+import pdfplumber
+from gigachat import GigaChat
+
+REPORTS_DIR = "reports"                       #указываем директорию с отчетами
+
+QUESTIONS = [                                           #создаем список вопросов, у каждого свой id
+    {
+        "id": "revenue_2024",
+        "question": "Какая выручка компании за 2024 год?"
+    },
+    {
+        "id": "net_profit_2024",
+        "question": "Какую чистую прибыль компания получила за 2024 год?"
+    },
+    {
+        "id": "total_assets_2024_12_31",
+        "question": "Какова общая сумма активов компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "cash_and_equivalents_2024_12_31",
+        "question": "Какова сумма денежных средств и их эквивалентов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "long_term_loans_2024_12_31",
+        "question": "Какова общая сумма долгосрочных кредитов и займов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "short_term_loans_2024_12_31",
+        "question": "Какова общая сумма краткосрочных кредитов и займов на 31 декабря 2024 года?"
+    },
+    {
+        "id": "dividends_paid_2024",
+        "question": "Какая сумма была выплачена в виде дивидендов за 2024 год?"
+    },
+    {
+        "id": "share_capital_2024_12_31",
+        "question": "Каков размер уставного капитала компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "ppe_book_value_2024_12_31",
+        "question": "Какова балансовая стоимость основных средств компании на 31 декабря 2024 года?"
+    },
+    {
+        "id": "income_tax_paid_2024",
+        "question": "Какова была сумма налога на прибыль, уплаченная компанией в 2024 году?"
+    }
+]
+
+questions_text = "\n".join(                                  #формируем структуру запроса в нейронку
+    [f"- {q['id']}: {q['question']}" for q in QUESTIONS]
+)
+
+schema_text = ",\n".join(                                #формируем структуру ответа
+    [
+        f'  "{q["id"]}": {{ "value": number | null, "currency": string | null, "evidence_found": boolean }}'
+        for q in QUESTIONS
+    ]
+)
+
+
+def read_pdf(path: str) -> str:                 #функция для чтения пдф, измлечения текста и соединение его в одну строку
+    text = ""
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    return text
+
+
+pdf_files = [                                     #формирование списка необходимых отчетов из директории
+    f for f in os.listdir(REPORTS_DIR)
+    if f.lower().endswith(".pdf")
+]
+
+
+with GigaChat(                                 #создаем запрос к нейронке для каждого отчета
+    credentials="#########",
+    verify_ssl_certs=False
+) as chat:
+
+    for pdf_name in pdf_files:
+        print(f"\n=== REPORT: {pdf_name} ===")
+
+        pdf_path = os.path.join(REPORTS_DIR, pdf_name)
+        report_text = read_pdf(pdf_path)
+
+        MAX_CHARS = 60000                #вводим ограничение по символам
+        report_text = report_text[:MAX_CHARS]
+
+        prompt = f"""                    #пропимываем промпт к нейронке
+Ты — система извлечения информации из финансовой отчетности.
+
+Ответь на вопросы СТРОГО на основе предоставленного текста.
+
+Верни СТРОГО JSON следующего формата:
+{{
+{schema_text}
+}}
+
+Правила:
+- Используй ТОЛЬКО предоставленный текст
+- НИЧЕГО не придумывай
+- Если информация не найдена — value = null и evidence_found = false
+
+Текст отчета:
+{report_text}
+
+Вопросы:
+{questions_text}
+"""
+
+        response = chat.chat(prompt)         #получаем ответ
+        print(response)
+
