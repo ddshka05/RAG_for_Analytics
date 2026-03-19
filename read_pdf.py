@@ -1,40 +1,82 @@
-import fitz # Импортируем PyMuPDF
-import zipfile # Импортируем модуль для работы с zip-файлом
+#!/usr/bin/env python
+# coding: utf-8
 
-def extract_text(pdf_data: bytes) -> str:
-  """
-  Функция написана для преобразования извлеченной информации из PDF-файла в виде байтов
-
-  params:
-  - pdf_path: содержимое файлов в виде байтов
-
-  output:
-  - text: текст из ПДФ
-
-  """
-  doc = fitz.open(stream = pdf_data, filetype="pdf")
-  text = ""
-
-  text_dict = {} # Будем хранить так {номер страницы: текст со страницы}
-  for page in enumerate(doc, 1):
-    text_dict[page[0]] = page[1].get_text()
-
-  doc.close()
-
-  return text
-
-data = {} # Создаем словарь для хранения данных по компаниям : {"Отчет_компании": [{номер страницы: текст со страницы}, ...], ...}
-
-with zipfile.ZipFile("DATA.zip", "r") as zip_data: # Открываем папку
-  file_list = zip_data.namelist() # С помощью функции namelist() считываем называния файлов в папке в список
+# In[1]:
 
 
-  for file_name in file_list:                # Проходимся циклом по каждому названию
-    clean_name = file_name.replace("Дата/", "") # Убираем название папки из имени компании
-    pdf_data = zip_data.read(file_name)      # Считываем текст из PDF в папке в виде байтов
-    text = extract_text(pdf_data)            # Пользуемся функцией для преобразования байтов в текст
-    data[clean_name] = [text]                 # сохраняем полученный результат в словарь
+get_ipython().system('pip install pymupdf')
 
-# Проверим, что получилось
+
+# In[3]:
+
+
+import fitz  # PyMuPDF
+import zipfile
+
+def extract_text(pdf_data: bytes) -> dict:
+    doc = fitz.open(stream=pdf_data, filetype="pdf")
+
+    text_dict = {}
+
+    for page_num, page in enumerate(doc, 1):
+        text_dict[page_num] = page.get_text()
+
+    doc.close()
+    return text_dict
+
+
+data = {}
+
+with zipfile.ZipFile("DATA.zip", "r") as zip_data:
+    file_list = zip_data.namelist()
+
+    for file_name in file_list:
+        clean_name = file_name.replace("Дата/", "")
+        pdf_data = zip_data.read(file_name)
+
+        page_dict = extract_text(pdf_data)
+
+        # сохраняем dict страниц
+        data[clean_name] = page_dict
+
+
+# Проверка
 for key, value in data.items():
-  print(f'Ключ: {key}, Значение: {value}.', sep='\n')
+    print(f"Ключ: {key}, страниц: {len(value)}")
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
