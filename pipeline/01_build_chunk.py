@@ -1,12 +1,18 @@
-import pandas as pd     #импортируем необходимые библиотеки
+import pandas as pd
 import re
 from pathlib import Path
 import pdfplumber
 import zipfile
 import os
 
-zip_path = "DATA.zip"
-extract_path = ""
+script_dir = Path(__file__).parent.resolve()   # папка, где лежит этот .py файл
+
+zip_path = script_dir / "DATA.zip"
+extract_path = script_dir
+
+print(f"Скрипт запущен из: {script_dir}")
+print(f"Ищем архив: {zip_path}")
+print(f"Распаковываем в: {extract_path}")
 
 os.makedirs(extract_path, exist_ok=True)
 
@@ -14,6 +20,7 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:   #извлекаем файлы
     zip_ref.extractall(extract_path)
 
 print("Архив распакован")
+print()
 
 def make_company_slug(name: str) -> str:   #создаем стабильные имена компаниям для сопоставления с отсальными файлами
     name = Path(name).stem.lower()
@@ -46,9 +53,10 @@ def read_reports_from_folder(folder_path: str) -> dict:      #проходим �
     return reports
 
 
-reports = read_reports_from_folder("/content/data")
+reports = read_reports_from_folder(extract_path)
 
 print("Загружено файлов:", len(reports))
+print()
 
 def is_table_line(line: str) -> bool:      #эта функция пытается понять, является ли строка частью таблицы
                                            #логика: если много цифр или мало текста, то скорее всего таблица
@@ -202,7 +210,7 @@ def validate_chunks_dataframe(df: pd.DataFrame): #проверка
 
 validate_chunks_dataframe(chunks_df)
 
-output_path = "/content/drive/MyDrive/проект RAG/chunks_final.csv"  #сохраняем таблицу с чанками
+output_path = script_dir  #сохраняем таблицу с чанками в папку, откуда запущен код
 
 chunks_df.to_csv(output_path, index=False)
 
