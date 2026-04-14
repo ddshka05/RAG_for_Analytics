@@ -1,6 +1,3 @@
 # RAG for Analytic
 
-### Description of repo:
-1. $read_pdf.py$ - file for parsing text from pdf files.
-2. $chanking.py$ - create chanks using lib.
-3. $DATA.zip$ - collected data.
+([Link](https://drive.google.com/drive/folders/1p6QnQrpZU-xdj-meZod4vKPGpM33DALX?usp=sharing)) for heavy files on Google Disk 
