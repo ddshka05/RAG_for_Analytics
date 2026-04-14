@@ -22,7 +22,7 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:   #извлекаем файлы
 print("Архив распакован")
 print()
 
-def make_company_slug(name: str) -> str:   #создаем стабильные имена компаниям для сопоставления с отсальными файлами
+def make_company_slug(name: str) -> str:   #создаем стабильные имена компаниям для сопоставления с остальными файлами
     name = Path(name).stem.lower()
     name = re.sub(r'[^a-zа-я0-9]+', ' ', name)
     name = name.strip(' ')
