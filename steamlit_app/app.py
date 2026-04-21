@@ -4,7 +4,7 @@ import re
 from rank_bm25 import BM25Okapi
 from pathlib import Path
 
-# ====================== НАСТРОЙКИ ======================
+# Настройки
 st.set_page_config(
     page_title="RAG • Финансовый Аналитик",
     page_icon="📊",
@@ -14,7 +14,7 @@ st.set_page_config(
 TOP_K = 5
 CHUNKS_PATH = "chunks_final.csv"
 
-# ====================== КЭШИРОВАНИЕ ======================
+# Закешируем чанки
 @st.cache_data(show_spinner="Загружаем корпус чанков...")
 def load_chunks():
     df = pd.read_csv(CHUNKS_PATH)
@@ -35,7 +35,7 @@ def build_bm25_index(chunks_df):
     tokenized_corpus = [simple_tokenize(text) for text in chunks_df["text"]]
     return BM25Okapi(tokenized_corpus), simple_tokenize
 
-# ====================== ОСНОВНОЙ КОД ======================
+# ===== Основной блок кода с реализацией интерфейса ====
 chunks_df = load_chunks()
 bm25_index, tokenize_func = build_bm25_index(chunks_df)
 
@@ -51,64 +51,66 @@ with st.sidebar:
     top_k = st.slider("Количество чанков (Top-K)", 3, 15, TOP_K)
     st.info(f"Всего чанков в базе: **{len(chunks_df)}**")
 
-# ====================== ЧАТ ======================
+# Чат
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# отображаем историю
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# поле ввода
-if prompt := st.chat_input("Задайте вопрос про финансовые показатели компании..."):
-    # добавляем сообщение пользователя
+if prompt := st.chat_input("Задайте вопрос по финансовым показателям компании..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # ====================== RETRIEVAL ======================
     with st.chat_message("assistant"):
-        with st.spinner("Ищем релевантные чанки по BM25..."):
+        with st.spinner("Ищем чанки и генерируем ответ..."):
+            # 1. BM25 retrieval
             tokenized_query = tokenize_func(prompt)
             scores = bm25_index.get_scores(tokenized_query)
-            
             top_indices = scores.argsort()[::-1][:top_k]
             
-            retrieved = []
-            for rank, idx in enumerate(top_indices, 1):
-                row = chunks_df.iloc[idx]
-                retrieved.append({
-                    "rank": rank,
-                    "chunk_id": row["chunk_id"],
-                    "score": round(float(scores[idx]), 4),
-                    "text": row["text"]
-                })
+            retrieved_chunks = [chunks_df.iloc[idx]["text"] for idx in top_indices]
+            context = "\n\n---\n\n".join(retrieved_chunks)
 
-        # показываем найденные чанки
-        st.markdown("### 🔍 Найденные чанки (BM25)")
-        for item in retrieved:
-            with st.expander(f"Rank {item['rank']} • chunk_id: {item['chunk_id']} • score: {item['score']}"):
-                st.write(item["text"][:800] + "..." if len(item["text"]) > 800 else item["text"])
-                st.caption(f"Полный текст чанка — {len(item['text'])} символов")
+            # 2. RAG-промпт (очень важная часть!)
+            system_prompt = """Ты — профессиональный финансовый аналитик публичных компаний (российский и международный рынок).
+Используй ТОЛЬКО информацию из предоставленного контекста.
+Отвечай точно, структурировано, с цифрами и фактами.
+Если в контексте нет информации — честно скажи об этом."""
 
-        # ====================== ЗАГЛУШКА ГЕНЕРАЦИИ ======================
-        st.markdown("### 🤖 Ответ RAG-модели")
-        
-        # TODO: сюда позже подключишь настоящий LLM (Ollama / Groq / Grok API / Llama-3 и т.д.)
+            user_prompt = f"""Контекст из документов:
+{context}
 
-        # сохраняем в историю
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": answer_placeholder
-        })
+Вопрос пользователя: {prompt}
 
-# ====================== НИЖНЯЯ ИНФО ======================
-st.divider()
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Метод поиска", "BM25")
-with col2:
-    st.metric("Размер корпуса", f"{len(chunks_df)} чанков")
-with col3:
-    st.metric("Версия демо", "v1")
+Дай полный и точный ответ:"""
+
+            # 3. Вызов OpenRouter
+            try:
+                selected_model = "openai/gpt-oss-20b"
+                response = client.chat.completions.create(
+                    model=selected_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=2048,
+                )
+                answer = response.choices[0].message.content
+                
+                # Показываем использованные чанки (для прозрачности)
+                with st.expander("🔍 Показать найденные чанки (BM25)"):
+                    for i, text in enumerate(retrieved_chunks, 1):
+                        st.write(f"**Чанк {i}** (score: {scores[top_indices[i-1]]:.4f})")
+                        st.caption(text[:600] + "..." if len(text) > 600 else text)
+                
+                st.markdown(answer)
+                
+            except Exception as e:
+                st.error(f"Ошибка OpenRouter: {e}")
+                answer = "Извините, произошла ошибка при обращении к LLM."
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
