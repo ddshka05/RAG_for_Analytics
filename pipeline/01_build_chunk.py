@@ -28,7 +28,9 @@ def make_company_slug(name: str) -> str:   #создаем стабильные 
     name = name.strip(' ')
     return name
 
-def read_reports_from_folder(folder_path: str) -> dict:      #проходим по всем пдф в папке, открываем каждый файл и извлекаем текст с каждой страницы,сохраняя при этом номер страницы для дальнейшего согласования с goldenset
+#проходим по всем пдф в папке, открываем каждый файл и извлекаем текст с каждой страницы,
+#сохраняя при этом номер страницы для дальнейшего согласования с goldenset
+def read_reports_from_folder(folder_path: str) -> dict:      
     reports = {}
 
     for file in Path(folder_path).rglob("*.pdf"):
