@@ -3,6 +3,13 @@ import pandas as pd
 import re
 from rank_bm25 import BM25Okapi
 from pathlib import Path
+from openai import OpenAI
+
+# Инициализация OpenRouter API
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=st.secrets.get("OPENROUTER_API_KEY")
+)
 
 # Настройки
 st.set_page_config(
