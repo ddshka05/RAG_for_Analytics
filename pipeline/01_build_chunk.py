@@ -31,7 +31,7 @@ def make_company_slug(name: str) -> str:   #создаем стабильные 
 #проходим по всем пдф в папке, открываем каждый файл и извлекаем текст с каждой страницы,
 #сохраняя при этом номер страницы для дальнейшего согласования с goldenset
 def read_reports_from_folder(folder_path: str) -> dict:      
-    reports = {}
+    reports = {} #создаем словарь, где будут хранится результаты чтения файлов
 
     for file in Path(folder_path).rglob("*.pdf"):
         print(f"Читаю файл: {file}")
@@ -39,17 +39,18 @@ def read_reports_from_folder(folder_path: str) -> dict:
         pages_dict = {}
 
         with pdfplumber.open(file) as pdf:
-            for i, page in enumerate(pdf.pages, start=1):
+            for i, page in enumerate(pdf.pages, start=1): #открывает файл и проходит по всем страницам
 
                 if i % 20 == 0:
                     print(f"страница {i}")
 
-                text = page.extract_text(x_tolerance=2, y_tolerance=2)
+                text = page.extract_text(x_tolerance=2, y_tolerance=2) #Извлекает текст со страницы. Параметры tolerance=2, скеливают символы
+                                                                       #в одно слово/строку, если символы находятся ближе 2 пикселей друг к другу
 
-                if text:
+                if text: #если элемент на странице - текст (а не логотип, например), помещает его в словарь
                     pages_dict[i] = text
 
-        if pages_dict:
+        if pages_dict: #Если в файле нашлась хотя бы одна страница с текстом, весь словарь pages_dict добавляется в главный словарь reports
             reports[str(file)] = pages_dict
 
     return reports
